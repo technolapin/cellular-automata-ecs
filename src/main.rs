@@ -11,7 +11,7 @@ les voisinages (cluster de cellules) sont des entitées
 
 */
 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 struct Cell {
     state: u8,
 }
@@ -67,19 +67,63 @@ struct Cluster {
     neighborhood: Vec<usize>,
     pos: usize, // the cell's position in the neighborhood
 }
-
 use specs::Component;
 use specs::DenseVecStorage;
+use specs::ReadStorage;
+use specs::System;
 impl Component for Cluster {
     type Storage = DenseVecStorage<Self>;
 }
 
 struct TransitionSystem;
 impl<'a> System<'a> for TransitionSystem {
-    type SystemData = (ReadStorage<'a, Cluster>, ReadStorage);
+    type SystemData = (ReadStorage<'a, Cluster>);
+    fn run(&mut self, datas: Self::SystemData) {}
+}
+
+fn automate(data: Cells) -> Cells {
+    let moore = vec![
+        (-1isize, -1isize),
+        (-1, 0),
+        (-1, 1),
+        (0, -1),
+        (0, 0),
+        (0, 1),
+        (1, -1),
+        (1, 0),
+        (1, 1),
+    ];
+
+    let woop: Vec<usize> = (0..data.vec.len())
+        .map(|i| {
+            let x0 = i % data.width;
+            let y0 = i / data.height;
+            moore.iter().filter_map(|&(x, y)| {
+                if x < 0 || y < 0 || (x as usize) >= data.width || y as usize >= data.height {
+                    None
+                } else {
+                    Some((x as usize) + data.width * (y as usize))
+                }
+            })
+        })
+        .collect();
+
+    println!("{:?}", woop);
+    Cells {
+        width: data.width,
+        height: data.height,
+
+        vec: data
+            .vec
+            .iter()
+            .zip(0..data.vec.len())
+            .map(|(&cell, i)| cell)
+            .collect(),
+    }
 }
 
 fn main() {
     let v = Cells::new(8, 8);
     v.print();
+    automate(v);
 }
