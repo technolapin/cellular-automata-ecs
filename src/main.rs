@@ -11,7 +11,7 @@ les voisinages (cluster de cellules) sont des entitées
 
 */
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 struct Cell {
     state: u8,
 }
@@ -52,6 +52,10 @@ impl Cells {
     fn read_pos(&self, x: usize, y: usize) -> &Cell {
         self.read(x + self.width * y)
     }
+    fn write_pos(&mut self, x: usize, y: usize, cell: Cell)
+    {
+        self.write(x + self.width * y, cell)
+    }
 
     fn print(&self) {
         for y in 0..self.height {
@@ -59,6 +63,58 @@ impl Cells {
                 print!("{}", self.read_pos(x, y).to_string());
             }
             println!();
+        }
+    }
+
+    fn step(&self) -> Self
+    {
+        let moore = vec![
+            (-1isize, -1isize),
+            (-1, 0),
+            (-1, 1),
+            (0, -1),
+            (0, 1),
+            (1, -1),
+            (1, 0),
+            (1, 1),
+        ];
+        Cells{
+            width: self.width,
+            height: self.height,
+            vec:
+            (0..self.vec.len())
+                .map(|i| {
+                    let x0 = i % self.width;
+                    let y0 = i / self.width;
+                    moore.iter().filter_map(|&(v_x, v_y)| {
+                        let x = x0 as isize + v_x;
+                        let y = y0 as isize + v_y;
+                        if x < 0 || y < 0 || (x as usize) >= self.width || y as usize >= self.height {
+                            None
+                        } else {
+                            Some(self.vec[(x as usize) + self.width * (y as usize)].state)
+                        }
+                    }).fold(0, |somme, ngh| somme+ngh)
+                }).zip(0..self.vec.len()).map(
+                    |(sum, i)| Cell{state:
+                                    match sum
+                                    {
+                                        2 => self.vec[i].state,
+                                        3 => 1,
+                                        _ => 0
+                                    }}
+                )
+                .collect()
+        }
+
+    }
+    fn evolve(&self, n: usize)
+    {
+        self.print();
+        match n
+        {
+            0 => (),
+            _ => self.step().evolve(n-1)
         }
     }
 }
@@ -81,49 +137,16 @@ impl<'a> System<'a> for TransitionSystem {
     fn run(&mut self, datas: Self::SystemData) {}
 }
 
-fn automate(data: Cells) -> Cells {
-    let moore = vec![
-        (-1isize, -1isize),
-        (-1, 0),
-        (-1, 1),
-        (0, -1),
-        (0, 0),
-        (0, 1),
-        (1, -1),
-        (1, 0),
-        (1, 1),
-    ];
-
-    let woop: Vec<usize> = (0..data.vec.len())
-        .map(|i| {
-            let x0 = i % data.width;
-            let y0 = i / data.height;
-            moore.iter().filter_map(|&(x, y)| {
-                if x < 0 || y < 0 || (x as usize) >= data.width || y as usize >= data.height {
-                    None
-                } else {
-                    Some((x as usize) + data.width * (y as usize))
-                }
-            })
-        })
-        .collect();
-
-    println!("{:?}", woop);
-    Cells {
-        width: data.width,
-        height: data.height,
-
-        vec: data
-            .vec
-            .iter()
-            .zip(0..data.vec.len())
-            .map(|(&cell, i)| cell)
-            .collect(),
-    }
-}
 
 fn main() {
-    let v = Cells::new(8, 8);
-    v.print();
-    automate(v);
+    const ON: Cell = Cell{state: 1};
+    const OFF: Cell = Cell{state: 0};
+    let mut v = Cells::new(19, 8);
+    v.write_pos(2, 1, ON);
+    v.write_pos(2, 2, ON);
+    v.write_pos(2, 3, ON);
+    v.write_pos(1, 3, ON);
+    v.write_pos(0, 2, ON);
+
+    v.evolve(20);
 }
